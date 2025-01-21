@@ -137,7 +137,12 @@ west_midlands <- read_csv('OA Resident Population\\west_midlands_oa_pop.csv') %>
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
 
-oa_population <- rbind(east_midlands, east_of_england, north_east, north_west, south_east, south_west, west_midlands)
+yorkshire_and_humber <- read_csv('OA Resident Population\\yorkshire_and_humber_oa_pop.csv') %>%
+  select('geography code','Variable: All usual residents; measures: Value') %>%
+  rename(oa11cd = 'geography code',
+         oa_population = 'Variable: All usual residents; measures: Value')
+
+oa_population <- rbind(east_midlands, east_of_england, north_east, north_west, south_east, south_west, west_midlands, yorkshire_and_humber)
 
 # We identified towns that span multiple LA earlier - join back onto lookup to get relevant OA and LAD
 OAs_town_la_partial_match_in_data <- inner_join(town_la_partial_match_in_data, oa_bua_lad, by=c('town_and_city_code','town_and_city_name'))
@@ -145,7 +150,7 @@ OAs_town_la_partial_match_in_data <- inner_join(town_la_partial_match_in_data, o
 
 # Join OA population to lookup
 OApop_town_la_partial_match_in_data <- OAs_town_la_partial_match_in_data %>% inner_join(oa_population, by='oa11cd') 
-#47380 rows, 169 towns
+#52237 rows, 177 towns
 
 # We have lost 8 town in this inner join - do all the OAs belong to this 1 town?
 
@@ -153,33 +158,11 @@ before_join <- OAs_town_la_partial_match_in_data
 after_join <- OApop_town_la_partial_match_in_data
 
 lost_rows <- before_join %>% anti_join(after_join, by='oa11cd')
-lost_rows %>% group_by(town_and_city_name) %>% summarize(n=n()) %>% arrange(desc(n))
+lost_rows %>% group_by(town_and_city_name) %>% summarize(n=n()) %>% arrange(desc(n)) 
 
-towns_before_join <- OAs_town_la_partial_match_in_data %>% select(town_and_city_name) %>% distinct()
-towns_after_join <- OApop_town_la_partial_match_in_data <- OAs_town_la_partial_match_in_data %>% inner_join(oa_population, by='oa11cd') %>%
-  select(town_and_city_name) %>% distinct()
-lost_towns <- towns_before_join %>% anti_join(towns_after_join, by='town_and_city_name')
-lost_towns %>% group_by(town_and_city_name) %>% summarize(n=n())
-
-# The following towns are completely missing - do they have any OA population data?
-#Batley BUASD
-#Bradford BUASD
-#Huddersfield BUASD
-#Immingham BUASD
-#Kingston upon Hull BUASD
-#Knottingley BUASD
-#Otley BUASD
-#Wakefield BUASD
-
-# The following towns are missing some OA population
-# Knottingley BUASD (47)
-# Immingham BUASD (35)
+# The following towns are missing some small numbers of OA population
 # Esher BUASD (2)
 # Borehamwood BUASD (1)
-
-
-
-
 
 #----------------------------------
 # Three cases we need to account for:
@@ -194,65 +177,57 @@ lost_towns %>% group_by(town_and_city_name) %>% summarize(n=n())
 # Create rule to select dominant LAD from town or provide a weighting for instances where the split is below 80%
 #------------------------------------
 #Group by town, sum total OA population and join back on
-town_total_pop <- OAs_town_city_spanning_LA %>% group_by(town_and_city_code) %>% summarize(town_population = sum(oa_population)) #170 rows
+town_total_pop <- OApop_town_la_partial_match_in_data %>% group_by(town_and_city_code) %>% summarize(town_population = sum(oa_population)) #177 rows
 
-OAs_town_city_spanning_LA <- left_join(OAs_town_city_spanning_LA, town_total_pop, by='town_and_city_code') #47695 rows, 170 towns
+OApop_town_la_partial_match_in_data <- left_join(OApop_town_la_partial_match_in_data, town_total_pop, by='town_and_city_code') #52237 rows, 177 towns
 
 #Group by town and LA, sum OA population and collapse so we have rows for just BUA and LA
-la_total_pop_within_town <- OAs_town_city_spanning_LA %>% group_by(town_and_city_code, lad11cd) %>% summarize(town_lad_population = sum(oa_population)) #389 rows
+la_total_pop_within_town <- OApop_town_la_partial_match_in_data %>% group_by(town_and_city_code, lad11cd) %>% summarize(town_lad_population = sum(oa_population)) #409 rows, 177 towns
 
-OAs_town_city_spanning_LA <- left_join(OAs_town_city_spanning_LA, la_total_pop_within_town, by=c('town_and_city_code','lad11cd')) #47695 rows, 170 towns
+OApop_town_la_partial_match_in_data <- left_join(OApop_town_la_partial_match_in_data, la_total_pop_within_town, by=c('town_and_city_code','lad11cd')) #52237 rows, 177 towns
 
-town_city_spanning_LA <- OAs_town_city_spanning_LA %>% select(town_and_city_code, town_and_city_name, lad11cd, lad11nm, town_population, town_lad_population) %>% distinct() #389 rows, 170 towns
+town_la_partial_match_in_data <- OApop_town_la_partial_match_in_data %>% select(town_and_city_code, town_and_city_name, lad11cd, lad11nm, town_population, town_lad_population) %>% distinct() #409 rows, 177 towns
 
 #Calculate share of population lying in each local authority for BUA
-town_city_spanning_LA <- town_city_spanning_LA %>% mutate(la_pop_share = town_lad_population/town_population)
+town_la_partial_match_in_data <- town_la_partial_match_in_data %>% mutate(la_pop_share = town_lad_population/town_population) #409 rows, 177 towns
 
-#For cases with an LA population share of <10% remove these rows (121 towns)
-town_city_spanning_LA %>% filter(la_pop_share < 0.1) %>% summarize(n_distinct(town_and_city_code))
+#For cases with an LA population share of <10% remove these rows (129 towns)
+town_la_partial_match_in_data %>% filter(la_pop_share < 0.1) %>% summarize(n_distinct(town_and_city_code))
 
-town_city_spanning_LA_share_filter <- town_city_spanning_LA %>% filter(la_pop_share > 0.1) #227 rows, 170 towns
+town_la_partial_match_in_data_filter <- town_la_partial_match_in_data %>% filter(la_pop_share > 0.1) #236 rows, 177 towns
 
-#After removing minority shares - how many towns are left that span multiple LA? 54 out of 170
-town_city_spanning_LA_share_filter %>% group_by(town_and_city_code) %>% summarize(la_span = n_distinct(lad11cd)) %>% filter(la_span > 1) %>% 
+#After removing minority shares - how many towns are left that span multiple LA? 56 out of 177
+town_la_partial_match_in_data_filter %>% group_by(town_and_city_code) %>% summarize(la_span = n_distinct(lad11cd)) %>% filter(la_span > 1) %>% 
   summarize(n_distinct(town_and_city_code))
 
-town_city_spanning_LA_recheck <- town_city_spanning_LA_share_filter %>% group_by(town_and_city_code) %>% summarize(la_span = n_distinct(lad11cd))
-town_city_spanning_LA_share_filter <- town_city_spanning_LA_share_filter %>% left_join(town_city_spanning_LA_recheck, by='town_and_city_code')
+la_span_recheck <- town_la_partial_match_in_data_filter %>% group_by(town_and_city_code) %>% summarize(la_span = n_distinct(lad11cd)) #177 rows
+town_la_partial_match_in_data_filter <- town_la_partial_match_in_data_filter %>% left_join(la_span_recheck, by='town_and_city_code')
 
-town_city_spanning_LA_majority_match <- town_city_spanning_LA_share_filter %>% filter(la_span == 1) #116 towns - this df can be appended to the direct matches
-town_city_spanning_LA_partial_match <- town_city_spanning_LA_share_filter %>% filter(la_span > 1) #54 towns- for this df we need to use population weights
-
+town_LA_majority_match <- town_la_partial_match_in_data_filter %>% filter(la_span == 1) #121 towns - this df can be appended to the direct matches
+town_LA_partial_match <- town_la_partial_match_in_data_filter %>% filter(la_span > 1) #56 towns- for this df we need to use population weights
 
 #--------------------------------------------------------------------
 #Construct an entire lookup for the graduate mobility data BUA TO LAD
 #--------------------------------------------------------------------
 
 # Append the majority matches to the direct matches
-town_city_spanning_LA_majority_match <- town_city_spanning_LA_majority_match %>% select(town_and_city_code, town_and_city_name, lad11cd, lad11nm)
+town_LA_majority_match <- town_LA_majority_match %>% select(town_and_city_code, town_and_city_name, lad11cd, lad11nm)
 
-town_LAD_lookup <- rbind(town_LAD_lookup, town_city_spanning_LA_majority_match) #1043 (now 1038 for some reason)
-
+town_LAD_lookup <- rbind(town_LAD_lookup, town_LA_majority_match) #1044
 
 # Append the partial matches whereby there are two BUAs per LA - we might need to make columns consistent for this
 
 #   Create blank columns for population weight
-town_city_spanning_LA_partial_match <- town_city_spanning_LA_partial_match %>% select(town_and_city_code, town_and_city_name, lad11cd, lad11nm, la_pop_share)
+town_LA_partial_match <- town_LA_partial_match %>% select(town_and_city_code, town_and_city_name, lad11cd, lad11nm, la_pop_share)
 
 town_LAD_lookup[,'la_pop_share'] <- 1
-town_LAD_lookup <- rbind(town_LAD_lookup, town_city_spanning_LA_partial_match) #1149 rows, 1092 towns (we've lost 12 towns along the way)
+town_LAD_lookup <- rbind(town_LAD_lookup, town_LA_partial_match) #1159 rows, 1100 towns (the extra 4 are the custom categories)
 
 # Join the list of towns and LAs to the graduate mobility data
-
-#Join direct lookup
-#town_LAD_lookup <- town_LAD_lookup %>% select(town_and_city_code, lad11cd, lad11nm) %>% distinct()
-
-grad_migration <- grad_migration %>% rename(town_and_city_code = bua11cd) #1104 rows, 1104 towns
-
 town_LAD_lookup_on_data <- inner_join(town_LAD_lookup, grad_migration, by=c('town_and_city_code','town_and_city_name')) %>% select(town_and_city_code, town_and_city_name, lad11cd, lad11nm, la_pop_share, number_of_graduates, graduate_retention_rate)
 
 #------------------------------------
-# Now we have a corresponding LA for every town now - let's aggregate up to LA level for our final dataset
+# Now we have a corresponding LA (for 56 >1 LA) for every town now - let's aggregate up to LA level for our final dataset
 #------------------------------------
 
 # Multiply the number of graduates by the population share so we have individual graduate numbers for every town
@@ -266,6 +241,10 @@ town_LAD_lookup_on_data <- town_LAD_lookup_on_data %>% mutate(graduate_retention
 
 # Where graduate retention rate is NA - do we want to include this towns number of graduates in the denominator for total LA graduate retention?
 
+# 1100 towns and cities - all are being assigned to a local authority
+
+
+
 # Group by local authority and sum both number of graduates and graduates retained
 local_authority_graduates <- town_LAD_lookup_on_data %>% group_by(lad11cd, lad11nm) %>% 
   summarize(number_of_graduates = sum(pop_weight_number_of_graduates, na.rm=TRUE), 
@@ -273,7 +252,7 @@ local_authority_graduates <- town_LAD_lookup_on_data %>% group_by(lad11cd, lad11
             graduate_retention_rate = number_of_retained_graduates / number_of_graduates) %>%
   ungroup()
 
-#291 Local Authorities / 348 originally in the lookup. England only?
+#292 Local Authorities / 326 originally in the lookup. 
 
 original_la_list <- oa_bua_lad %>% select(lad11nm) %>% distinct()
 
@@ -281,7 +260,7 @@ final_la_list <- local_authority_graduates %>% select(lad11nm)
 
 la_difference <- original_la_list %>% anti_join(final_la_list, by='lad11nm')
 
-# Wales and London
+# London
 # Graduate mobility data aggregates London boroughs to Inner Outer London so we need to do the same?
 
 #---------------------------------------------------
@@ -297,9 +276,15 @@ london <- grad_migration %>% filter((town_and_city_name == 'Inner London BUA') |
 
 local_authority_graduates <- rbind(local_authority_graduates, london)
 
+#Final counts
+# 294 local authorities
+# 
+
 #---------------------------------------------------
 # Assess what % of the LA population the BUA makes up
 #---------------------------------------------------
+
+final_la_list <- local_authority_graduates %>% select(lad11nm) %>% distinct()
 
 # Let's filter the OA to BUA to LA lookup to just the LA's we finish with in our data
 filtered_lookup <- oa_bua_lad %>% inner_join(final_la_list, by='lad11nm')
