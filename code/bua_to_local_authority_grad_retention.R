@@ -6,16 +6,14 @@ library(janitor)
 library(readxl)
 library(dplyr)
 library(openxlsx)
-
-setwd("C:\\Users\\shephw1\\Documents\\Datasets\\LA\\")
+library(here)
 
 #-----------------------------------------------------------------------
 # Read in OA to BUA to LAD lookup which we will use to go between the levels of geography
 #----------------------------------------------------------------------
 
 # Using OA to BUA to LAD lookup
-
-oa_bua_lad <- read_csv('OA(2011)_to_BUAsubdivision_to_BUA_to_LAD_to_Region_(December_2011)_Lookup_in_England_and_Wales.csv')
+oa_bua_lad <- read_csv(here("data","OA(2011)_to_BUAsubdivision_to_BUA_to_LAD_to_Region_(December_2011)_Lookup_in_England_and_Wales.csv"))
 oa_bua_lad <- clean_names(oa_bua_lad)
 
 #Filter out Wales LA's because the grad mobility data is England only
@@ -56,7 +54,7 @@ oa_bua_lad %>% group_by(town_and_city_code) %>% summarize(la_span = n_distinct(l
 # Now obtain from the graduate mobility data the list of BUA that we want to convert to LA
 #-----------------------------------------------------------------------------------------
 # Read in graduate mobility data
-grad_migration <- read_xlsx('BUA_geographical_mobility.xlsx',sheet=2) 
+grad_migration <- read_xlsx((here("data","BUA_geographical_mobility.xlsx")), sheet=2)
 grad_migration <-clean_names(grad_migration)
 
 # 1104 BUA/BUASD in towns and cities
@@ -66,7 +64,7 @@ grad_migration %>% summarize(n_distinct(town_and_city_code))
 grad_migration %>% inner_join(oa_bua_lad, by='town_and_city_code') %>% summarize(n_distinct(town_and_city_code))
 
 common_places <-grad_migration %>% inner_join(oa_bua_lad, by='town_and_city_code')
-  
+
 uncommon_places <- grad_migration %>% anti_join(common_places, by='town_and_city_code')
 # Inner London BUA
 # Outer London BUA
@@ -102,42 +100,42 @@ town_LAD_lookup <- town_la_direct_match_in_data %>% inner_join(oa_bua_lad, by='t
 #--------------------------------------------------------------------
 
 # Read in regional OA residence population and join together
-east_midlands <- read_csv('OA Resident Population\\east_midlands_oa_pop.csv') %>% 
+east_midlands <- read_csv(here("data/oa_populations","east_midlands_oa_pop.csv")) %>% 
   select('geography code', 'Variable: All usual residents; measures: Value') %>% 
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
 
-east_of_england <- read_csv('OA Resident Population\\east_of_england_oa_pop.csv') %>% 
+east_of_england <- read_csv(here("data/oa_populations","east_of_england_oa_pop.csv")) %>% 
   select('geography code', 'Variable: All usual residents; measures: Value') %>% 
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
 
-north_east <- read_csv('OA Resident Population\\north_east_oa_pop.csv') %>% 
+north_east <- read_csv(here("data/oa_populations","north_east_oa_pop.csv")) %>% 
   select('geography code', 'Variable: All usual residents; measures: Value') %>% 
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
 
-north_west <- read_csv('OA Resident Population\\north_west_oa_pop.csv') %>% 
+north_west <- read_csv(here("data/oa_populations","north_west_oa_pop.csv")) %>% 
   select('geography code', 'Variable: All usual residents; measures: Value') %>% 
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
 
-south_east <- read_csv('OA Resident Population\\south_east_oa_pop.csv') %>% 
+south_east <- read_csv(here("data/oa_populations","south_east_oa_pop.csv")) %>% 
   select('geography code', 'Variable: All usual residents; measures: Value') %>% 
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
 
-south_west <- read_csv('OA Resident Population\\south_west_oa_pop.csv') %>% 
+south_west <- read_csv(here("data/oa_populations","south_west_oa_pop.csv")) %>% 
   select('geography code', 'Variable: All usual residents; measures: Value') %>% 
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
 
-west_midlands <- read_csv('OA Resident Population\\west_midlands_oa_pop.csv') %>% 
+west_midlands <- read_csv(here("data/oa_populations","west_midlands_oa_pop.csv")) %>% 
   select('geography code', 'Variable: All usual residents; measures: Value') %>% 
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
 
-yorkshire_and_humber <- read_csv('OA Resident Population\\yorkshire_and_humber_oa_pop.csv') %>%
+yorkshire_and_humber <- read_csv(here("data/oa_populations","yorkshire_and_humber_oa_pop.csv")) %>%
   select('geography code','Variable: All usual residents; measures: Value') %>%
   rename(oa11cd = 'geography code',
          oa_population = 'Variable: All usual residents; measures: Value')
