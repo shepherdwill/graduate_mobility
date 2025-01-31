@@ -276,7 +276,11 @@ local_authority_graduates <- rbind(local_authority_graduates, london)
 
 #Final counts
 # 294 local authorities
-# 
+
+# Export to csv
+to.csv(local_authority_graduates, here("data","la_grad_retention"))
+
+
 
 #---------------------------------------------------
 # Assess what % of the LA population the BUA makes up
