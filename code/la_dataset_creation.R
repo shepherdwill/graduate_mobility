@@ -311,14 +311,56 @@ la_cross_section <- la_cross_section %>% mutate(arts_council_per_head_201819 = a
 
 
 #----------------------
-# Read in jobs density
+# Read in jobs density - 409 local authorities
 
+jobs_density <- read_xlsx(here("data","jobs_density_nomis.xlsx"), skip=5) %>%
+  select(1,7) %>% rename(lad11nm = 1, jobs_density_2018 = 2)
 
+# Aggregate to Inner and Outer London
+jobs_density <- jobs_density %>% mutate(london_flag = case_when(
+  lad11nm %in% inner_london ~ "Inner London BUA",
+  lad11nm %in% outer_london ~ "Outer London BUA",
+  TRUE ~ 'Other'
+))
+
+london_jobs_density <- jobs_density %>% filter(london_flag != 'Other') %>%
+  mutate(jobs_density_2018 = as.double(jobs_density_2018)) %>%
+  group_by(london_flag) %>% summarize(jobs_density_2018 = median(jobs_density_2018)) %>%
+  rename(lad11nm = london_flag)
+
+jobs_density <- jobs_density %>% filter(london_flag == "Other") %>% select(-london_flag) %>%
+  rbind(london_jobs_density)
+
+la_cross_section <- la_cross_section %>% left_join(jobs_density, by='lad11nm')
 
 #-------------------------
 # Read in labour productivity
 
+lab_prod <- read_xls(here("data","labourproductivitylocalauthorities.xls"), sheet=3,skip=4) %>%
+  select(LAD_Code, LAD_Name, Pounds_2018) %>%
+  rename(lad11cd = LAD_Code, lad11nm = LAD_Name, gva_2018 = Pounds_2018)
+
+# Contains the new local authorities
+mismatch <- lab_prod %>% anti_join(graduate_retention, by='lad11nm')
+
+# Aggregate to Inner and Outer London
+lab_prod <- lab_prod %>% mutate(london_flag = case_when(
+  lad11nm %in% inner_london ~ "Inner London BUA",
+  lad11nm %in% outer_london ~ "Outer London BUA",
+  TRUE ~ 'Other'
+))
+
+london_lab_prod <- lab_prod %>% filter(london_flag != 'Other') %>%
+  mutate(gva_2018 = as.double(gva_2018)) %>%
+  group_by(london_flag) %>% summarize(gva_2018 = mean(gva_2018)) %>%
+  rename(lad11nm = london_flag)
+
+lab_prod <- lab_prod %>% filter(london_flag == "Other") %>% select(-london_flag,-lad11cd) %>%
+  rbind(london_lab_prod)
+
+la_cross_section <- la_cross_section %>% left_join(lab_prod, by='lad11nm')
+
 #-----------------------
 # Save to CSV
 
-write.csv(la_cross_section, here("data","la_cross_section.csv"), )
+write.csv(la_cross_section, here("data","la_cross_section.csv") )
